@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>จัดการผู้ใช้ - Hub</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%97%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="topbar">
+  <h1>👤 จัดการผู้ใช้</h1>
+  <div class="user-info">
+    <span id="whoami"></span>
+    <a href="hub.html">กลับหน้าหลัก</a>
+    <button onclick="logout()">ออกจากระบบ</button>
+  </div>
+</div>
+<div class="container">
+  <div class="nav-tabs">
+    <a href="admin.html">หมวดหมู่ / ลิงก์</a>
+    <a href="admin-users.html" class="active">จัดการผู้ใช้</a>
+  </div>
+
+  <div class="admin-section">
+    <h3>เพิ่มผู้ใช้ใหม่</h3>
+    <div class="form-row">
+      <input type="text" id="newUsername" placeholder="ชื่อผู้ใช้">
+      <input type="text" id="newPassword" placeholder="รหัสผ่าน">
+      <input type="text" id="newDisplayName" placeholder="ชื่อที่แสดง">
+      <select id="newRole" onchange="toggleNewCats()">
+        <option value="admin">admin</option>
+        <option value="user" selected>user</option>
+      </select>
+      <button class="btn" onclick="addUser()">+ เพิ่มผู้ใช้</button>
+    </div>
+    <div id="newCatsWrap">
+      <div class="cat-hint">เมนูที่ user นี้เห็นในหน้าแรก (ไม่เลือกเลย = เห็นทุกเมนู):</div>
+      <div id="newCatsChecks" class="cat-checks"></div>
+    </div>
+  </div>
+
+  <div class="admin-section">
+    <h3>รายชื่อผู้ใช้</h3>
+    <table id="userTable">
+      <tr><th>ชื่อผู้ใช้</th><th>ชื่อที่แสดง</th><th>สิทธิ์</th><th>เมนูที่เห็น</th><th>รหัสผ่านใหม่</th><th></th></tr>
+    </table>
+  </div>
+</div>
+
+<!-- Modal เลือกเมนูที่ user เห็น -->
+<div id="catModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <h3>เมนูที่เห็นในหน้าแรก: <span id="catModalUser" style="color:#ffe14d;"></span></h3>
+    <div class="cat-hint">ติ๊กเฉพาะเมนูที่ให้เห็น — ไม่ติ๊กเลย = เห็นทุกเมนู</div>
+    <div id="catModalChecks" class="cat-checks"></div>
+    <div style="margin-top:18px; text-align:right;">
+      <button class="btn" onclick="saveCatModal()">บันทึก</button>
+      <button class="btn" style="background:rgba(120,130,150,0.5);" onclick="closeCatModal()">ยกเลิก</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+var session = requireLogin();
+if (!session || session.role !== 'admin') {
+  alert('หน้านี้สำหรับ admin เท่านั้น');
+  window.location.href = 'hub.html';
+}
+document.getElementById('whoami').textContent = session.displayName + ' (' + session.role + ')';
+
+var allUsers = [];
+var allCategories = [];   // ชื่อหมวดทั้งหมด เรียงตาม categoryOrder
+var catModalUsername = null;
+
+function loadData() {
+  Promise.all([apiGet('getUsers'), apiGet('getLinks')]).then(function (results) {
+    var uRes = results[0], lRes = results[1];
+    allUsers = (uRes && uRes.success) ? (uRes.data || []) : [];
+    allCategories = buildCategoryList((lRes && lRes.success) ? (lRes.data || []) : []);
+    buildCatChecks(document.getElementById('newCatsChecks'), []);
+    renderUsers();
+  });
+}
+loadData();
+
+function buildCategoryList(links) {
+  var order = {};
+  var seen = [];
+  links.forEach(function (l) {
+    if (seen.indexOf(l.category) === -1) { seen.push(l.category); order[l.category] = l.categoryOrder || 0; }
+  });
+  seen.sort(function (a, b) {
+    if (order[a] !== order[b]) return order[a] - order[b];
+    return a.localeCompare(b);
+  });
+  return seen;
+}
+
+// สร้าง checkbox หมวดลงใน container (ใช้ DOM ตรงๆ เลี่ยงปัญหา escape ชื่อหมวด)
+function buildCatChecks(container, checkedArr) {
+  container.innerHTML = '';
+  if (!allCategories.length) {
+    container.innerHTML = '<span class="cat-hint">ยังไม่มีหมวดในระบบ</span>';
+    return;
+  }
+  allCategories.forEach(function (cat) {
+    var label = document.createElement('label');
+    label.className = 'cat-check';
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'cat-cb';
+    cb.value = cat;
+    if (checkedArr.indexOf(cat) !== -1) cb.checked = true;
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(' ' + cat));
+    container.appendChild(label);
+  });
+}
+
+function readChecked(container) {
+  var out = [];
+  container.querySelectorAll('.cat-cb:checked').forEach(function (cb) { out.push(cb.value); });
+  return out;
+}
+
+function toggleNewCats() {
+  var isUser = document.getElementById('newRole').value === 'user';
+  document.getElementById('newCatsWrap').style.display = isUser ? 'block' : 'none';
+}
+
+function menuSummary(u) {
+  if (u.role === 'admin') return '<span class="cat-hint">ทุกเมนู (admin)</span>';
+  var cats = u.allowedCategories || [];
+  if (!cats.length) return '<span class="cat-hint">ทุกเมนู</span>';
+  return escapeHtml(cats.join(', '));
+}
+
+function renderUsers() {
+  var table = document.getElementById('userTable');
+  table.innerHTML = '<tr><th>ชื่อผู้ใช้</th><th>ชื่อที่แสดง</th><th>สิทธิ์</th><th>เมนูที่เห็น</th><th>รหัสผ่านใหม่</th><th></th></tr>';
+  allUsers.forEach(function (u) {
+    var menuCell = u.role === 'admin'
+      ? menuSummary(u)
+      : '<div style="margin-bottom:6px;">' + menuSummary(u) + '</div><button class="btn small" onclick="openCatModal(\'' + escapeAttr(u.username) + '\')">เลือกเมนู</button>';
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' + escapeHtml(u.username) + '</td>' +
+      '<td><input type="text" value="' + escapeAttr(u.displayName) + '" onchange="updateUser(\'' + escapeAttr(u.username) + '\',\'displayName\',this.value)"></td>' +
+      '<td>' + roleSelect(u.username, u.role) + '</td>' +
+      '<td>' + menuCell + '</td>' +
+      '<td><input type="text" placeholder="(ไม่เปลี่ยน)" onchange="updateUser(\'' + escapeAttr(u.username) + '\',\'password\',this.value)"></td>' +
+      '<td>' + (u.username === session.username ? '' : '<button class="btn small danger" onclick="deleteUser(\'' + escapeAttr(u.username) + '\')">ลบ</button>') + '</td>';
+    table.appendChild(tr);
+  });
+}
+
+function roleSelect(username, current) {
+  var roles = ['admin', 'user'];
+  var html = '<select onchange="updateUser(\'' + escapeAttr(username) + '\',\'userRole\',this.value)">';
+  roles.forEach(function (r) {
+    html += '<option value="' + r + '"' + (r === current ? ' selected' : '') + '>' + r + '</option>';
+  });
+  html += '</select>';
+  return html;
+}
+
+function addUser() {
+  var username = document.getElementById('newUsername').value.trim();
+  var password = document.getElementById('newPassword').value.trim();
+  var displayName = document.getElementById('newDisplayName').value.trim();
+  var role = document.getElementById('newRole').value;
+  if (!username || !password) {
+    alert('กรอกชื่อผู้ใช้และรหัสผ่าน');
+    return;
+  }
+  var cats = role === 'user' ? readChecked(document.getElementById('newCatsChecks')) : [];
+  apiPost('addUser', {
+    role: session.role, username: username, password: password,
+    displayName: displayName, userRole: role, allowedCategories: cats
+  }).then(function (res) {
+    if (res.success) {
+      document.getElementById('newUsername').value = '';
+      document.getElementById('newPassword').value = '';
+      document.getElementById('newDisplayName').value = '';
+      buildCatChecks(document.getElementById('newCatsChecks'), []);
+      loadData();
+    } else {
+      alert(res.message || 'เพิ่มไม่สำเร็จ');
+    }
+  });
+}
+
+function updateUser(username, field, value) {
+  if (field === 'password' && !value) return;
+  var payload = { role: session.role, username: username };
+  payload[field] = value;
+  apiPost('editUser', payload).then(function (res) {
+    if (!res.success) alert(res.message || 'แก้ไขไม่สำเร็จ');
+    else loadData();
+  });
+}
+
+function openCatModal(username) {
+  var u = allUsers.find(function (x) { return x.username === username; });
+  if (!u) return;
+  catModalUsername = username;
+  document.getElementById('catModalUser').textContent = username;
+  buildCatChecks(document.getElementById('catModalChecks'), u.allowedCategories || []);
+  document.getElementById('catModal').style.display = 'flex';
+}
+
+function closeCatModal() {
+  document.getElementById('catModal').style.display = 'none';
+  catModalUsername = null;
+}
+
+function saveCatModal() {
+  if (!catModalUsername) return;
+  var cats = readChecked(document.getElementById('catModalChecks'));
+  apiPost('editUser', { role: session.role, username: catModalUsername, allowedCategories: cats }).then(function (res) {
+    if (res.success) { closeCatModal(); loadData(); }
+    else alert(res.message || 'บันทึกไม่สำเร็จ');
+  });
+}
+
+function deleteUser(username) {
+  if (!confirm('ลบผู้ใช้ "' + username + '" ใช่ไหม?')) return;
+  apiPost('deleteUser', { role: session.role, username: username }).then(function (res) {
+    if (res.success) loadData(); else alert(res.message || 'ลบไม่สำเร็จ');
+  });
+}
+
+function escapeHtml(s) {
+  var div = document.createElement('div');
+  div.textContent = s == null ? '' : s;
+  return div.innerHTML;
+}
+function escapeAttr(s) {
+  return (s == null ? '' : String(s)).replace(/'/g, "\\'");
+}
+</script>
+</body>
+</html>

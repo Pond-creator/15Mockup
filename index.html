@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login - Hub</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%97%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-box">
+    <h2>🔗 Hub Login</h2>
+    <div class="error-msg" id="errMsg"></div>
+    <input type="text" id="username" placeholder="ชื่อผู้ใช้" autocomplete="username">
+    <input type="password" id="password" placeholder="รหัสผ่าน" autocomplete="current-password">
+    <button onclick="doLogin()">เข้าสู่ระบบ</button>
+  </div>
+</div>
+<script src="js/api.js"></script>
+<script>
+document.getElementById('password').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') doLogin();
+});
+
+function doLogin() {
+  var username = document.getElementById('username').value.trim();
+  var password = document.getElementById('password').value;
+  var errEl = document.getElementById('errMsg');
+  errEl.textContent = '';
+  if (!username || !password) {
+    errEl.textContent = 'กรอกชื่อผู้ใช้และรหัสผ่านให้ครบ';
+    return;
+  }
+  apiPost('login', { username: username, password: password }).then(function (res) {
+    if (res.success) {
+      sessionStorage.setItem('hubUser', JSON.stringify({
+        username: username, role: res.role, displayName: res.displayName,
+        allowedCategories: res.allowedCategories || []
+      }));
+      window.location.href = 'hub.html';
+    } else {
+      errEl.textContent = res.message || 'เข้าสู่ระบบไม่สำเร็จ';
+    }
+  }).catch(function () {
+    errEl.textContent = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้';
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>จัดการหน้า - Hub</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%97%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="topbar">
+  <h1>⚙️ จัดการหมวดหมู่ / ลิงก์</h1>
+  <div class="user-info">
+    <span id="whoami"></span>
+    <a href="hub.html">กลับหน้าหลัก</a>
+    <button onclick="logout()">ออกจากระบบ</button>
+  </div>
+</div>
+<div class="container">
+  <div class="nav-tabs">
+    <a href="admin.html" class="active">หมวดหมู่ / ลิงก์</a>
+    <a href="admin-users.html">จัดการผู้ใช้</a>
+  </div>
+
+  <div class="admin-section">
+    <h3>เพิ่มลิงก์ใหม่</h3>
+    <div class="form-row">
+      <input type="text" id="newCategory" placeholder="ชื่อหมวดหมู่ (พิมพ์ชื่อเดิมเพื่อเพิ่มในหมวดเดียวกัน)" list="categoryList">
+      <datalist id="categoryList"></datalist>
+      <input type="text" id="newName" placeholder="ชื่อลิงก์ที่แสดง">
+      <input type="text" id="newUrl" placeholder="URL (https://...)">
+    </div>
+    <div class="form-row">
+      <input type="text" id="newDesc" placeholder="รายละเอียด (ไม่บังคับ — คำอธิบายสั้นๆ ของลิงก์นี้)">
+      <button class="btn" onclick="addLink()">+ เพิ่มลิงก์</button>
+    </div>
+  </div>
+
+  <div id="categoriesArea"></div>
+</div>
+<script src="js/api.js"></script>
+<script>
+var session = requireLogin();
+if (!session || session.role !== 'admin') {
+  alert('หน้านี้สำหรับ admin เท่านั้น');
+  window.location.href = 'hub.html';
+}
+document.getElementById('whoami').textContent = session.displayName + ' (' + session.role + ')';
+
+var allLinks = [];
+
+function loadAll() {
+  apiGet('getLinks').then(function (res) {
+    allLinks = res.success ? (res.data || []) : [];
+    renderCategoryList();
+    renderTables();
+  });
+}
+loadAll();
+
+function renderCategoryList() {
+  var cats = Array.from(new Set(allLinks.map(function (l) { return l.category; })));
+  document.getElementById('categoryList').innerHTML = cats.map(function (c) {
+    return '<option value="' + escapeHtml(c) + '">';
+  }).join('');
+}
+
+// จัดกลุ่มลิงก์ตามหมวด
+function groupByCategory() {
+  var byCategory = {};
+  allLinks.forEach(function (l) {
+    if (!byCategory[l.category]) byCategory[l.category] = [];
+    byCategory[l.category].push(l);
+  });
+  return byCategory;
+}
+
+// รายชื่อหมวดเรียงตาม categoryOrder (แล้วตามชื่อ) — ให้ตรงกับหน้าแรก
+function getOrderedCategories() {
+  var byCategory = groupByCategory();
+  return Object.keys(byCategory).sort(function (a, b) {
+    var oa = byCategory[a][0].categoryOrder || 0;
+    var ob = byCategory[b][0].categoryOrder || 0;
+    if (oa !== ob) return oa - ob;
+    return a.localeCompare(b);
+  });
+}
+
+function renderTables() {
+  var byCategory = groupByCategory();
+  var categories = getOrderedCategories();
+  var area = document.getElementById('categoriesArea');
+  if (!categories.length) {
+    area.innerHTML = '<div class="empty-msg">ยังไม่มีหมวดหมู่ — เพิ่มลิงก์แรกด้านบน</div>';
+    return;
+  }
+  var html = '';
+  categories.forEach(function (cat, ci) {
+    var upDis = ci === 0 ? ' disabled' : '';
+    var downDis = ci === categories.length - 1 ? ' disabled' : '';
+    html += '<div class="admin-section">';
+    html += '<h3>';
+    html += '<button class="btn small" title="เลื่อนขึ้น" onclick="moveCategory(\'' + escapeAttr(cat) + '\',-1)"' + upDis + '>↑</button> ';
+    html += '<button class="btn small" title="เลื่อนลง" onclick="moveCategory(\'' + escapeAttr(cat) + '\',1)"' + downDis + '>↓</button> ';
+    html += 'หมวด: ' + escapeHtml(cat) + ' ';
+    html += '<button class="btn small" onclick="renameCategory(\'' + escapeAttr(cat) + '\')">แก้ชื่อหมวด</button> ';
+    html += '<button class="btn small danger" onclick="deleteCategory(\'' + escapeAttr(cat) + '\')">ลบทั้งหมวด</button>';
+    html += '</h3>';
+    html += '<table><tr><th>ชื่อลิงก์</th><th>รายละเอียด</th><th>URL</th><th>สถานะ</th><th></th></tr>';
+    byCategory[cat].forEach(function (l) {
+      var isOn = l.active !== false;
+      html += '<tr>';
+      html += '<td><input type="text" value="' + escapeAttr(l.name) + '" onchange="updateLinkField(\'' + l.id + '\',\'name\',this.value)"></td>';
+      html += '<td><input type="text" value="' + escapeAttr(l.description || '') + '" placeholder="คำอธิบาย" onchange="updateLinkField(\'' + l.id + '\',\'description\',this.value)"></td>';
+      html += '<td><input type="text" value="' + escapeAttr(l.url) + '" onchange="updateLinkField(\'' + l.id + '\',\'url\',this.value)" style="width:100%"></td>';
+      html += '<td><button class="btn small ' + (isOn ? 'on' : 'off') + '" onclick="toggleActive(\'' + l.id + '\',' + isOn + ')">' + (isOn ? '✓ เปิด' : '✕ ปิด') + '</button></td>';
+      html += '<td><button class="btn small danger" onclick="deleteLink(\'' + l.id + '\')">ลบ</button></td>';
+      html += '</tr>';
+    });
+    html += '</table></div>';
+  });
+  area.innerHTML = html;
+}
+
+function moveCategory(cat, dir) {
+  var cats = getOrderedCategories();
+  var idx = cats.indexOf(cat);
+  var swap = idx + dir;
+  if (idx < 0 || swap < 0 || swap >= cats.length) return;
+  var tmp = cats[idx]; cats[idx] = cats[swap]; cats[swap] = tmp;
+  apiPost('setCategoryOrders', { role: session.role, categories: cats }).then(function (res) {
+    if (res.success) loadAll(); else alert(res.message || 'จัดลำดับไม่สำเร็จ');
+  });
+}
+
+function toggleActive(id, isOn) {
+  apiPost('setLinkActive', { role: session.role, id: id, active: !isOn }).then(function (res) {
+    if (res.success) loadAll(); else alert(res.message || 'เปลี่ยนสถานะไม่สำเร็จ');
+  });
+}
+
+function addLink() {
+  var category = document.getElementById('newCategory').value.trim();
+  var name = document.getElementById('newName').value.trim();
+  var url = document.getElementById('newUrl').value.trim();
+  var description = document.getElementById('newDesc').value.trim();
+  if (!category || !name || !url) {
+    alert('กรอกหมวดหมู่ ชื่อลิงก์ และ URL ให้ครบ');
+    return;
+  }
+  apiPost('addLink', { role: session.role, category: category, name: name, url: url, description: description }).then(function (res) {
+    if (res.success) {
+      document.getElementById('newName').value = '';
+      document.getElementById('newUrl').value = '';
+      document.getElementById('newDesc').value = '';
+      loadAll();
+    } else {
+      alert(res.message || 'เพิ่มไม่สำเร็จ');
+    }
+  });
+}
+
+function updateLinkField(id, field, value) {
+  var link = allLinks.find(function (l) { return l.id === id; });
+  if (!link) return;
+  // ส่งค่าปัจจุบันทั้งหมด + ทับ field ที่แก้ (editLink ต้องมี category/name/url เสมอ)
+  var payload = {
+    role: session.role,
+    id: id,
+    category: field === 'category' ? value : link.category,
+    name: field === 'name' ? value : link.name,
+    url: field === 'url' ? value : link.url,
+    description: field === 'description' ? value : (link.description || '')
+  };
+  apiPost('editLink', payload).then(function (res) {
+    if (!res.success) alert(res.message || 'แก้ไขไม่สำเร็จ');
+    loadAll();
+  });
+}
+
+function deleteLink(id) {
+  if (!confirm('ลบลิงก์นี้ใช่ไหม?')) return;
+  apiPost('deleteLink', { role: session.role, id: id }).then(function (res) {
+    if (res.success) loadAll(); else alert(res.message || 'ลบไม่สำเร็จ');
+  });
+}
+
+function renameCategory(oldName) {
+  var newName = prompt('ชื่อหมวดใหม่', oldName);
+  if (!newName || newName === oldName) return;
+  apiPost('renameCategory', { role: session.role, oldName: oldName, newName: newName }).then(function (res) {
+    if (res.success) loadAll(); else alert(res.message || 'แก้ไขไม่สำเร็จ');
+  });
+}
+
+function deleteCategory(cat) {
+  if (!confirm('ลบหมวด "' + cat + '" พร้อมลิงก์ทั้งหมดในหมวดนี้ใช่ไหม?')) return;
+  apiPost('deleteCategory', { role: session.role, category: cat }).then(function (res) {
+    if (res.success) loadAll(); else alert(res.message || 'ลบไม่สำเร็จ');
+  });
+}
+
+function escapeHtml(s) {
+  var div = document.createElement('div');
+  div.textContent = s == null ? '' : s;
+  return div.innerHTML;
+}
+function escapeAttr(s) {
+  return (s == null ? '' : String(s)).replace(/'/g, "\\'");
+}
+</script>
+</body>
+</html>

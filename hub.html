@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hub - รวมงานทั้งหมด</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%97%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="topbar">
+  <h1>🔗 Hub รวมงานทั้งหมด</h1>
+  <div class="user-info">
+    <span id="whoami"></span>
+    <a href="admin.html" id="adminLink" style="display:none;">จัดการหน้า</a>
+    <button onclick="logout()">ออกจากระบบ</button>
+  </div>
+</div>
+<div class="container" id="container">
+  <div class="empty-msg">กำลังโหลด...</div>
+</div>
+<script src="js/api.js"></script>
+<script>
+var session = requireLogin();
+if (session) {
+  document.getElementById('whoami').textContent = session.displayName + ' (' + session.role + ')';
+  if (session.role === 'admin') document.getElementById('adminLink').style.display = 'inline-block';
+  loadLinks();
+}
+
+function loadLinks() {
+  apiGet('getLinks').then(function (res) {
+    var container = document.getElementById('container');
+    if (!res.success) {
+      container.innerHTML = '<div class="empty-msg">โหลดข้อมูลไม่สำเร็จ: ' + (res.message || '') + '</div>';
+      return;
+    }
+    // แสดงเฉพาะลิงก์ที่เปิดใช้งาน (active)
+    var links = (res.data || []).filter(function (l) { return l.active !== false; });
+    if (!links.length) {
+      container.innerHTML = '<div class="empty-msg">ยังไม่มีลิงก์ — ไปที่ "จัดการหน้า" เพื่อเพิ่ม</div>';
+      return;
+    }
+    var byCategory = {};
+    links.forEach(function (l) {
+      if (!byCategory[l.category]) byCategory[l.category] = [];
+      byCategory[l.category].push(l);
+    });
+    var categories = Object.keys(byCategory).sort(function (a, b) {
+      var oa = byCategory[a][0].categoryOrder || 0;
+      var ob = byCategory[b][0].categoryOrder || 0;
+      if (oa !== ob) return oa - ob;
+      return a.localeCompare(b);
+    });
+    // จำกัดหมวดตามสิทธิ์ user (admin เห็นทุกหมวด, user ที่ระบุหมวดไว้เห็นเฉพาะที่ระบุ, ไม่ระบุ = เห็นทุกหมวด)
+    var allowed = (session && session.allowedCategories) || [];
+    if (session && session.role !== 'admin' && allowed.length) {
+      categories = categories.filter(function (c) { return allowed.indexOf(c) !== -1; });
+    }
+    if (!categories.length) {
+      container.innerHTML = '<div class="empty-msg">ยังไม่มีเมนูที่คุณเข้าถึงได้ — ติดต่อผู้ดูแลระบบ</div>';
+      return;
+    }
+    var html = '<div class="hub-categories">';
+    categories.forEach(function (cat) {
+      var items = byCategory[cat].slice().sort(function (a, b) { return (a.linkOrder || 0) - (b.linkOrder || 0); });
+      html += '<div class="category-block">';
+      html += '<div class="category-title">' + escapeHtml(cat) + '</div>';
+      html += '<div class="link-list">';
+      items.forEach(function (l) {
+        html += '<a class="link-card" href="' + escapeHtml(l.url) + '" target="_blank" rel="noopener">';
+        html += '<span class="link-name">' + escapeHtml(l.name) + '</span>';
+        if (l.description) html += '<span class="link-desc">' + escapeHtml(l.description) + '</span>';
+        html += '</a>';
+      });
+      html += '</div></div>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+  }).catch(function () {
+    document.getElementById('container').innerHTML = '<div class="empty-msg">เชื่อมต่อเซิร์ฟเวอร์ไม่ได้</div>';
+  });
+}
+
+function escapeHtml(s) {
+  var div = document.createElement('div');
+  div.textContent = s == null ? '' : s;
+  return div.innerHTML;
+}
+</script>
+</body>
+</html>
