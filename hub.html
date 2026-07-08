@@ -108,7 +108,9 @@ function renderHub(query) {
     items.forEach(function (l) {
       var icon = l.icon ? l.icon : '🔗';
       html += '<a class="link-card" href="' + escapeHtml(l.url) + '" target="_blank" rel="noopener">';
-      html += '<span class="link-icon">' + escapeHtml(icon) + '</span>';
+      html += '<span class="link-icon">' + escapeHtml(icon);
+      if (l.requiresLogin) html += '<span class="login-badge" title="ต้อง login ก่อนเข้าใช้งาน">🔑</span>';
+      html += '</span>';
       html += '<span class="link-text">';
       html += '<span class="link-name">' + escapeHtml(l.name) + '</span>';
       if (l.description) html += '<span class="link-desc">' + escapeHtml(l.description) + '</span>';

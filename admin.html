@@ -33,6 +33,9 @@
     <div class="form-row">
       <input type="text" id="newIcon" placeholder="ไอคอน emoji (ไม่บังคับ เช่น 📊 📁 💰)" style="max-width:220px;">
       <input type="text" id="newDesc" placeholder="รายละเอียด (ไม่บังคับ — คำอธิบายสั้นๆ ของลิงก์นี้)">
+    </div>
+    <div class="form-row" style="align-items:center;">
+      <label class="cat-check"><input type="checkbox" id="newRequiresLogin"> 🔑 เว็บนี้ต้อง login ก่อนเข้าใช้งาน</label>
       <button class="btn" onclick="addLink()">+ เพิ่มลิงก์</button>
     </div>
   </div>
@@ -107,14 +110,16 @@ function renderTables() {
     html += '<button class="btn small" onclick="renameCategory(\'' + escapeAttr(cat) + '\')">แก้ชื่อหมวด</button> ';
     html += '<button class="btn small danger" onclick="deleteCategory(\'' + escapeAttr(cat) + '\')">ลบทั้งหมวด</button>';
     html += '</h3>';
-    html += '<table><tr><th>ไอคอน</th><th>ชื่อลิงก์</th><th>รายละเอียด</th><th>URL</th><th>สถานะ</th><th></th></tr>';
+    html += '<table><tr><th>ไอคอน</th><th>ชื่อลิงก์</th><th>รายละเอียด</th><th>URL</th><th>🔑 ต้อง login</th><th>สถานะ</th><th></th></tr>';
     byCategory[cat].forEach(function (l) {
       var isOn = l.active !== false;
+      var needsLogin = l.requiresLogin === true;
       html += '<tr>';
       html += '<td><input type="text" value="' + escapeAttr(l.icon || '') + '" placeholder="🔗" style="width:52px;text-align:center;" onchange="updateLinkField(\'' + l.id + '\',\'icon\',this.value)"></td>';
       html += '<td><input type="text" value="' + escapeAttr(l.name) + '" onchange="updateLinkField(\'' + l.id + '\',\'name\',this.value)"></td>';
       html += '<td><input type="text" value="' + escapeAttr(l.description || '') + '" placeholder="คำอธิบาย" onchange="updateLinkField(\'' + l.id + '\',\'description\',this.value)"></td>';
       html += '<td><input type="text" value="' + escapeAttr(l.url) + '" onchange="updateLinkField(\'' + l.id + '\',\'url\',this.value)" style="width:100%"></td>';
+      html += '<td style="text-align:center;"><input type="checkbox" ' + (needsLogin ? 'checked' : '') + ' onchange="updateLinkField(\'' + l.id + '\',\'requiresLogin\',this.checked)"></td>';
       html += '<td><button class="btn small ' + (isOn ? 'on' : 'off') + '" onclick="toggleActive(\'' + l.id + '\',' + isOn + ')">' + (isOn ? '✓ เปิด' : '✕ ปิด') + '</button></td>';
       html += '<td><button class="btn small danger" onclick="deleteLink(\'' + l.id + '\')">ลบ</button></td>';
       html += '</tr>';
@@ -147,16 +152,18 @@ function addLink() {
   var url = document.getElementById('newUrl').value.trim();
   var description = document.getElementById('newDesc').value.trim();
   var icon = document.getElementById('newIcon').value.trim();
+  var requiresLogin = document.getElementById('newRequiresLogin').checked;
   if (!category || !name || !url) {
     alert('กรอกหมวดหมู่ ชื่อลิงก์ และ URL ให้ครบ');
     return;
   }
-  apiPost('addLink', { role: session.role, category: category, name: name, url: url, description: description, icon: icon }).then(function (res) {
+  apiPost('addLink', { role: session.role, category: category, name: name, url: url, description: description, icon: icon, requiresLogin: requiresLogin }).then(function (res) {
     if (res.success) {
       document.getElementById('newName').value = '';
       document.getElementById('newUrl').value = '';
       document.getElementById('newDesc').value = '';
       document.getElementById('newIcon').value = '';
+      document.getElementById('newRequiresLogin').checked = false;
       loadAll();
     } else {
       alert(res.message || 'เพิ่มไม่สำเร็จ');
@@ -175,7 +182,8 @@ function updateLinkField(id, field, value) {
     name: field === 'name' ? value : link.name,
     url: field === 'url' ? value : link.url,
     description: field === 'description' ? value : (link.description || ''),
-    icon: field === 'icon' ? value : (link.icon || '')
+    icon: field === 'icon' ? value : (link.icon || ''),
+    requiresLogin: field === 'requiresLogin' ? value : (link.requiresLogin === true)
   };
   apiPost('editLink', payload).then(function (res) {
     if (!res.success) alert(res.message || 'แก้ไขไม่สำเร็จ');
