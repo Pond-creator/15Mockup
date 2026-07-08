@@ -18,8 +18,21 @@ function apiPost(action, payload) {
   }).then(function (r) { return r.json(); });
 }
 
+// "จำฉันไว้" ติ๊ก = เก็บใน localStorage (อยู่ข้ามการปิดเบราว์เซอร์ จนกว่าจะ logout เอง)
+// ไม่ติ๊ก = เก็บใน sessionStorage (หายเมื่อปิดแท็บ) เหมือนเดิม
+function setSession(data, remember) {
+  var raw = JSON.stringify(data);
+  if (remember) {
+    localStorage.setItem('hubUser', raw);
+    sessionStorage.removeItem('hubUser');
+  } else {
+    sessionStorage.setItem('hubUser', raw);
+    localStorage.removeItem('hubUser');
+  }
+}
+
 function getSession() {
-  var raw = sessionStorage.getItem('hubUser');
+  var raw = localStorage.getItem('hubUser') || sessionStorage.getItem('hubUser');
   return raw ? JSON.parse(raw) : null;
 }
 
@@ -34,6 +47,7 @@ function requireLogin() {
 
 function logout() {
   sessionStorage.removeItem('hubUser');
+  localStorage.removeItem('hubUser');
   window.location.href = 'index.html';
 }
 

@@ -14,6 +14,9 @@
     <div class="error-msg" id="errMsg"></div>
     <input type="text" id="username" placeholder="ชื่อผู้ใช้" autocomplete="username">
     <input type="password" id="password" placeholder="รหัสผ่าน" autocomplete="current-password">
+    <label class="remember-check">
+      <input type="checkbox" id="rememberMe"> จำฉันไว้ในเครื่องนี้ (ใช้เฉพาะเครื่องส่วนตัว)
+    </label>
     <button onclick="doLogin()">เข้าสู่ระบบ</button>
   </div>
 </div>
@@ -34,10 +37,11 @@ function doLogin() {
   }
   apiPost('login', { username: username, password: password }).then(function (res) {
     if (res.success) {
-      sessionStorage.setItem('hubUser', JSON.stringify({
+      var remember = document.getElementById('rememberMe').checked;
+      setSession({
         username: username, role: res.role, displayName: res.displayName,
         allowedCategories: res.allowedCategories || []
-      }));
+      }, remember);
       window.location.href = 'hub.html';
     } else {
       errEl.textContent = res.message || 'เข้าสู่ระบบไม่สำเร็จ';
