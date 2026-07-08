@@ -28,6 +28,9 @@ if (session) {
   loadLinks();
 }
 
+var hubCategories = [];   // ชื่อหมวดตามลำดับ (หลังกรองสิทธิ์แล้ว)
+var hubByCategory = {};   // หมวด -> อาเรย์ลิงก์
+
 function loadLinks() {
   apiGet('getLinks').then(function (res) {
     var container = document.getElementById('container');
@@ -41,45 +44,83 @@ function loadLinks() {
       container.innerHTML = '<div class="empty-msg">ยังไม่มีลิงก์ — ไปที่ "จัดการหน้า" เพื่อเพิ่ม</div>';
       return;
     }
-    var byCategory = {};
+    hubByCategory = {};
     links.forEach(function (l) {
-      if (!byCategory[l.category]) byCategory[l.category] = [];
-      byCategory[l.category].push(l);
+      if (!hubByCategory[l.category]) hubByCategory[l.category] = [];
+      hubByCategory[l.category].push(l);
     });
-    var categories = Object.keys(byCategory).sort(function (a, b) {
-      var oa = byCategory[a][0].categoryOrder || 0;
-      var ob = byCategory[b][0].categoryOrder || 0;
+    hubCategories = Object.keys(hubByCategory).sort(function (a, b) {
+      var oa = hubByCategory[a][0].categoryOrder || 0;
+      var ob = hubByCategory[b][0].categoryOrder || 0;
       if (oa !== ob) return oa - ob;
       return a.localeCompare(b);
     });
     // จำกัดหมวดตามสิทธิ์ user (admin เห็นทุกหมวด, user ที่ระบุหมวดไว้เห็นเฉพาะที่ระบุ, ไม่ระบุ = เห็นทุกหมวด)
     var allowed = (session && session.allowedCategories) || [];
     if (session && session.role !== 'admin' && allowed.length) {
-      categories = categories.filter(function (c) { return allowed.indexOf(c) !== -1; });
+      hubCategories = hubCategories.filter(function (c) { return allowed.indexOf(c) !== -1; });
     }
-    if (!categories.length) {
+    if (!hubCategories.length) {
       container.innerHTML = '<div class="empty-msg">ยังไม่มีเมนูที่คุณเข้าถึงได้ — ติดต่อผู้ดูแลระบบ</div>';
       return;
     }
-    var html = '<div class="hub-categories">';
-    categories.forEach(function (cat) {
-      var items = byCategory[cat].slice().sort(function (a, b) { return (a.linkOrder || 0) - (b.linkOrder || 0); });
-      html += '<div class="category-block">';
-      html += '<div class="category-title">' + escapeHtml(cat) + '</div>';
-      html += '<div class="link-list">';
-      items.forEach(function (l) {
-        html += '<a class="link-card" href="' + escapeHtml(l.url) + '" target="_blank" rel="noopener">';
-        html += '<span class="link-name">' + escapeHtml(l.name) + '</span>';
-        if (l.description) html += '<span class="link-desc">' + escapeHtml(l.description) + '</span>';
-        html += '</a>';
-      });
-      html += '</div></div>';
+    // โครงหน้า: ช่องค้นหา + พื้นที่แสดงหมวด
+    container.innerHTML =
+      '<div class="search-wrap">' +
+        '<span class="search-icon">🔍</span>' +
+        '<input type="text" id="searchBox" class="search-box" placeholder="ค้นหาลิงก์ / หมวด...">' +
+        '<span class="search-clear" id="searchClear" title="ล้าง">✕</span>' +
+      '</div>' +
+      '<div id="hubCats"></div>';
+    var box = document.getElementById('searchBox');
+    box.addEventListener('input', function () { renderHub(this.value); });
+    document.getElementById('searchClear').addEventListener('click', function () {
+      box.value = ''; renderHub(''); box.focus();
     });
-    html += '</div>';
-    container.innerHTML = html;
+    renderHub('');
   }).catch(function () {
     document.getElementById('container').innerHTML = '<div class="empty-msg">เชื่อมต่อเซิร์ฟเวอร์ไม่ได้</div>';
   });
+}
+
+function renderHub(query) {
+  var q = (query || '').trim().toLowerCase();
+  var host = document.getElementById('hubCats');
+  var clearBtn = document.getElementById('searchClear');
+  if (clearBtn) clearBtn.style.display = q ? 'flex' : 'none';
+  var html = '<div class="hub-categories">';
+  var totalShown = 0;
+  hubCategories.forEach(function (cat) {
+    var items = hubByCategory[cat].slice().sort(function (a, b) { return (a.linkOrder || 0) - (b.linkOrder || 0); });
+    if (q) {
+      var catMatch = cat.toLowerCase().indexOf(q) !== -1;
+      items = items.filter(function (l) {
+        return catMatch ||
+          (l.name || '').toLowerCase().indexOf(q) !== -1 ||
+          (l.description || '').toLowerCase().indexOf(q) !== -1;
+      });
+    }
+    if (!items.length) return;   // ซ่อนหมวดที่ไม่มีลิงก์ตรงคำค้น
+    totalShown += items.length;
+    html += '<div class="category-block">';
+    html += '<div class="category-title">' + escapeHtml(cat) + '</div>';
+    html += '<div class="link-list">';
+    items.forEach(function (l) {
+      var icon = l.icon ? l.icon : '🔗';
+      html += '<a class="link-card" href="' + escapeHtml(l.url) + '" target="_blank" rel="noopener">';
+      html += '<span class="link-icon">' + escapeHtml(icon) + '</span>';
+      html += '<span class="link-text">';
+      html += '<span class="link-name">' + escapeHtml(l.name) + '</span>';
+      if (l.description) html += '<span class="link-desc">' + escapeHtml(l.description) + '</span>';
+      html += '</span></a>';
+    });
+    html += '</div></div>';
+  });
+  html += '</div>';
+  if (!totalShown) {
+    html = '<div class="empty-msg">ไม่พบลิงก์ที่ตรงกับ "' + escapeHtml(query) + '"</div>';
+  }
+  host.innerHTML = html;
 }
 
 function escapeHtml(s) {

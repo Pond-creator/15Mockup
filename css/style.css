@@ -257,6 +257,56 @@ body::after {
   margin-bottom: 18px;
   text-shadow: 0 0 8px rgba(255, 225, 80, 0.85), 0 0 18px rgba(255, 200, 40, 0.5);
 }
+/* ช่องค้นหาลิงก์ */
+.search-wrap {
+  position: relative;
+  max-width: 520px;
+  margin: 0 auto 30px;
+}
+.search-box {
+  width: 100%;
+  padding: 13px 44px 13px 44px;
+  font-size: 15px;
+  color: #eaf0ff;
+  background: rgba(16, 20, 42, 0.65);
+  border: 1px solid rgba(130, 160, 255, 0.3);
+  border-radius: 30px;
+  backdrop-filter: blur(10px);
+  transition: border-color .15s, box-shadow .15s;
+}
+.search-box::placeholder { color: #8a93b5; }
+.search-box:focus {
+  outline: none;
+  border-color: rgba(150, 190, 255, 0.8);
+  box-shadow: 0 0 18px rgba(120, 150, 255, 0.45);
+}
+.search-icon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 15px;
+  opacity: 0.7;
+  pointer-events: none;
+}
+.search-clear {
+  display: none;
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 12px;
+  color: #cfd6f5;
+  background: rgba(120, 150, 255, 0.25);
+  cursor: pointer;
+}
+.search-clear:hover { background: rgba(120, 150, 255, 0.45); }
+
 /* หน้าแรก: หมวดเรียง 3 คอลัมน์ */
 .hub-categories {
   display: grid;
@@ -272,17 +322,33 @@ body::after {
 }
 .link-list { display: flex; flex-direction: column; gap: 12px; }
 .link-card {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 13px;
   background: rgba(20, 26, 52, 0.55);
   border: 1px solid rgba(130, 160, 255, 0.28);
   border-radius: 16px;
-  padding: 16px 18px;
+  padding: 14px 16px;
   text-align: left;
   color: #eaf0ff;
   text-decoration: none;
   backdrop-filter: blur(6px);
   transition: transform .15s, box-shadow .15s, border-color .15s, background .15s;
 }
+.link-card .link-icon {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 21px;
+  border-radius: 12px;
+  background: radial-gradient(circle at 35% 30%, rgba(120, 150, 255, 0.35), rgba(30, 40, 80, 0.6));
+  border: 1px solid rgba(150, 180, 255, 0.3);
+  box-shadow: 0 0 14px rgba(90, 120, 255, 0.25), inset 0 0 10px rgba(150, 180, 255, 0.15);
+}
+.link-card .link-text { min-width: 0; flex: 1; }
 .link-card .link-name { display: block; font-weight: 600; }
 .link-card .link-desc {
   display: block;
