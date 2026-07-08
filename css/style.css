@@ -138,43 +138,7 @@ body::after {
   100% { transform: scale(18); opacity: 0; }
 }
 
-/* ===== ผิวดวงจันทร์ โค้งเต็มขอบล่าง (earthrise style) ===== */
-.moon-surface {
-  position: fixed;
-  left: 50%;
-  bottom: -1980px;               /* วงกลมยักษ์จมลงล่าง เหลือแค่ส่วนโค้งบนโผล่เป็นขอบฟ้า (กินพื้นที่ล่าง ~1/3) */
-  width: 2200px;
-  height: 2200px;
-  transform: translateX(-50%);
-  border-radius: 50%;
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
-  /* หลุมอุกกาบาต (วางแถบบนของวงกลม = ส่วนที่โผล่พ้นจอ) + เนื้อผิวเทาไล่แสงจากซ้ายบน */
-  background:
-    radial-gradient(circle at 30% 15.5%, rgba(40,42,52,0.55) 0 26px, rgba(190,194,206,0.28) 27px 32px, transparent 34px),
-    radial-gradient(circle at 44% 17.5%, rgba(40,42,52,0.5) 0 40px, rgba(190,194,206,0.25) 41px 47px, transparent 49px),
-    radial-gradient(circle at 58% 14.5%, rgba(40,42,52,0.5) 0 20px, rgba(190,194,206,0.28) 21px 25px, transparent 27px),
-    radial-gradient(circle at 68% 18%,  rgba(40,42,52,0.45) 0 34px, rgba(190,194,206,0.24) 35px 40px, transparent 42px),
-    radial-gradient(circle at 22% 19%,  rgba(40,42,52,0.45) 0 18px, rgba(190,194,206,0.22) 19px 23px, transparent 25px),
-    radial-gradient(circle at 50% 21%,  rgba(40,42,52,0.4) 0 30px, rgba(190,194,206,0.2) 31px 36px, transparent 38px),
-    radial-gradient(circle at 37% 22.5%,rgba(40,42,52,0.38) 0 14px, transparent 16px),
-    radial-gradient(circle at 63% 23%,  rgba(40,42,52,0.36) 0 22px, rgba(190,194,206,0.18) 23px 26px, transparent 28px),
-    radial-gradient(circle at 76% 21.5%,rgba(40,42,52,0.34) 0 12px, transparent 14px),
-    /* หลุมเพิ่มเติม — ให้ผิวขรุขระขึ้น */
-    radial-gradient(circle at 16% 22%,  rgba(40,42,52,0.4) 0 24px, rgba(190,194,206,0.2) 25px 29px, transparent 31px),
-    radial-gradient(circle at 84% 24%,  rgba(40,42,52,0.38) 0 28px, rgba(190,194,206,0.18) 29px 33px, transparent 35px),
-    radial-gradient(circle at 40% 12%,  rgba(40,42,52,0.42) 0 12px, transparent 14px),
-    radial-gradient(circle at 54% 26%,  rgba(40,42,52,0.34) 0 16px, transparent 18px),
-    radial-gradient(circle at 28% 25.5%,rgba(40,42,52,0.3) 0 10px, transparent 12px),
-    radial-gradient(circle at 71% 26.5%,rgba(40,42,52,0.32) 0 15px, transparent 17px),
-    radial-gradient(circle at 48% 9%,   rgba(40,42,52,0.3) 0 9px,  transparent 11px),
-    radial-gradient(circle at 20% 13%,  rgba(40,42,52,0.28) 0 8px,  transparent 10px),
-    radial-gradient(circle at 66% 11%,  rgba(40,42,52,0.28) 0 7px,  transparent 9px),
-    radial-gradient(circle at 32% 6%, #cfd4de 0%, #a9afbd 30%, #7e8494 60%, #4c505d 100%);
-  box-shadow: 0 -30px 90px rgba(120, 150, 255, 0.12);  /* ขอบฟ้าเรืองแสงจางๆ */
-}
-/* ===== โลก ดวงเล็ก เสี้ยวสีฟ้า มุมล่างขวา ===== */
+/* ===== โลก ดวงเล็ก เสี้ยวสีฟ้า มุมล่างขวา หมุนช้าๆ ===== */
 .earth {
   position: fixed;
   bottom: 80px;
@@ -191,11 +155,15 @@ body::after {
     inset -11px -4px 13px rgba(3, 8, 22, 0.92),
     0 0 10px rgba(120, 180, 255, 0.7),
     0 0 22px rgba(90, 150, 255, 0.35);
-  animation: earthglow 7s ease-in-out infinite;
+  animation: earthglow 7s ease-in-out infinite, earthspin 90s linear infinite;
 }
 @keyframes earthglow {
   0%, 100% { box-shadow: inset -11px -4px 13px rgba(3,8,22,0.92), 0 0 10px rgba(120,180,255,0.6), 0 0 22px rgba(90,150,255,0.3); }
   50%      { box-shadow: inset -11px -4px 13px rgba(3,8,22,0.92), 0 0 14px rgba(140,195,255,0.8), 0 0 28px rgba(110,165,255,0.45); }
+}
+@keyframes earthspin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
 /* ทำให้เนื้อหาลอยเหนือชั้นดาว */
@@ -553,22 +521,36 @@ table select {
 
 .empty-msg { color: #8a93b5; text-align: center; padding: 44px 0; }
 
-/* ===== เอฟเฟกต์ไฟฟ้าช็อต/สายฟ้า ตอนเมาส์ชี้ปุ่ม ===== */
-@keyframes electric-zap {
-  0%   { box-shadow: 0 0 5px #6ea8ff, 0 0 12px #7a5cff, 0 0 20px #4ad5ff, inset 0 0 6px rgba(150,220,255,0.5); }
-  20%  { box-shadow: 0 0 14px #cfe9ff, 0 0 22px #9a7cff, 0 0 34px #4ad5ff, inset 0 0 10px rgba(190,235,255,0.8); }
-  40%  { box-shadow: 0 0 4px #6ea8ff, 0 0 9px #7a5cff, 0 0 16px #4ad5ff, inset 0 0 4px rgba(150,220,255,0.4); }
-  60%  { box-shadow: 0 0 16px #e6f5ff, 0 0 26px #b39cff, 0 0 40px #6ae0ff, inset 0 0 12px rgba(210,245,255,0.9); }
-  80%  { box-shadow: 0 0 7px #6ea8ff, 0 0 14px #7a5cff, 0 0 22px #4ad5ff, inset 0 0 6px rgba(150,220,255,0.5); }
-  100% { box-shadow: 0 0 11px #b3e0ff, 0 0 18px #8a6cff, 0 0 28px #4ad5ff, inset 0 0 8px rgba(180,230,255,0.7); }
+/* ===== เอฟเฟกต์ตอนเมาส์ชี้ปุ่ม: ฝูงดาวพุ่งเข้าหาปุ่ม (ไม่กระพริบ) ===== */
+.btn, .link-card, .topbar a, .topbar button, .topbar-toggle, .login-box button, .nav-tabs a {
+  position: relative;
 }
-/* ปุ่มลบ (สีแดง) → ไฟลุกสีส้ม */
-@keyframes fire-zap {
-  0%   { box-shadow: 0 0 6px #ffb347, 0 0 14px #ff7b2e, 0 0 22px #ff4500; }
-  25%  { box-shadow: 0 0 14px #ffd27a, 0 0 24px #ff8c3a, 0 0 36px #ff5a1a; }
-  50%  { box-shadow: 0 0 5px #ffb347, 0 0 10px #ff6a2e, 0 0 18px #ff3000; }
-  75%  { box-shadow: 0 0 16px #ffe0a0, 0 0 28px #ff9d4a, 0 0 42px #ff5a1a; }
-  100% { box-shadow: 0 0 9px #ffb347, 0 0 16px #ff7b2e, 0 0 26px #ff4500; }
+.btn::after, .link-card::after, .topbar a::after, .topbar button::after,
+.topbar-toggle::after, .login-box button::after, .nav-tabs a::after {
+  content: "";
+  position: absolute;
+  inset: -34px;
+  pointer-events: none;
+  opacity: 0;
+  background-repeat: no-repeat;
+  background-size: 5px 5px;
+  background-image:
+    radial-gradient(circle, #ffffff 0 2px, transparent 3px),
+    radial-gradient(circle, #cfe0ff 0 2px, transparent 3px),
+    radial-gradient(circle, #ffffff 0 2px, transparent 3px),
+    radial-gradient(circle, #cfe0ff 0 2px, transparent 3px),
+    radial-gradient(circle, #ffffff 0 2px, transparent 3px),
+    radial-gradient(circle, #cfe0ff 0 2px, transparent 3px);
+  background-position: 8% 12%, 90% 15%, 12% 85%, 88% 88%, 50% 4%, 50% 96%;
+}
+.btn:hover::after, .link-card:hover::after, .topbar a:hover::after, .topbar button:hover::after,
+.topbar-toggle:hover::after, .login-box button:hover::after, .nav-tabs a:hover::after {
+  animation: starswarm 0.55s ease-out forwards;
+}
+@keyframes starswarm {
+  0%   { opacity: 0; transform: scale(1.9); }
+  35%  { opacity: 1; }
+  100% { opacity: 0; transform: scale(0.25); }
 }
 .btn:hover,
 .link-card:hover,
@@ -577,10 +559,19 @@ table select {
 .topbar-toggle:hover,
 .login-box button:hover,
 .nav-tabs a:hover {
-  animation: electric-zap 0.3s linear infinite;
   border-color: rgba(180, 220, 255, 0.9);
+  box-shadow: 0 0 16px rgba(120, 150, 255, 0.5);
 }
-.btn.danger:hover { animation: fire-zap 0.28s linear infinite; border-color: rgba(255, 180, 120, 0.9); }
+.btn.danger:hover { border-color: rgba(255, 180, 120, 0.9); box-shadow: 0 0 16px rgba(255, 140, 70, 0.5); }
+
+/* ===== ชี้ปุ่มไหน เบลอปุ่มอื่นที่เหลือในกลุ่มเดียวกัน (โฟกัสตัวที่ชี้) ===== */
+body:has(.link-card:hover) .link-card:not(:hover) {
+  filter: blur(2.5px);
+  opacity: 0.5;
+}
+.link-card {
+  transition: filter .18s, opacity .18s, transform .15s, box-shadow .15s, border-color .15s, background .15s;
+}
 
 /* แท็บเล็ต: หมวด 2 คอลัมน์ */
 @media (max-width: 900px) and (min-width: 641px) {
@@ -628,8 +619,11 @@ table select {
 @media (prefers-reduced-motion: reduce) {
   body::before, body::after, .shooting-star, .earth { animation: none !important; }
   .shooting-star { display: none; }
-  /* ปิดไฟฟ้ากะพริบ เหลือแค่เรืองแสงนิ่ง */
-  .btn:hover, .link-card:hover, .topbar a:hover, .topbar button:hover,
-  .topbar-toggle:hover, .login-box button:hover, .nav-tabs a:hover,
-  .btn.danger:hover { animation: none !important; box-shadow: 0 0 16px rgba(120,150,255,0.6) !important; }
+  /* ปิดฝูงดาวพุ่ง + เบลอปุ่มอื่น เหลือแค่เรืองแสงนิ่ง */
+  .btn:hover::after, .link-card:hover::after, .topbar a:hover::after, .topbar button:hover::after,
+  .topbar-toggle:hover::after, .login-box button:hover::after, .nav-tabs a:hover::after {
+    animation: none !important;
+    opacity: 0 !important;
+  }
+  body:has(.link-card:hover) .link-card:not(:hover) { filter: none !important; opacity: 1 !important; }
 }

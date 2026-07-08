@@ -51,7 +51,7 @@ function logout() {
   window.location.href = 'index.html';
 }
 
-// แทรกฉากอวกาศ (ผิวจันทร์ + โลก) แล้วยิงดาวตกแบบสุ่ม นานๆ ที (เบามาก — element เดียวโผล่แล้วหายทีละดวง)
+// แทรกฉากอวกาศ (โลกหมุนช้าๆ) แล้วยิงดาวตกแบบสุ่ม นานๆ ที (เบามาก — element เดียวโผล่แล้วหายทีละดวง)
 (function injectSpaceScene() {
   var pendingTimer = null;
   var impactTimer = null;
@@ -60,7 +60,7 @@ function logout() {
     if (document.querySelector('.shooting-stars')) return;
     var wrap = document.createElement('div');
     wrap.className = 'shooting-stars';
-    wrap.innerHTML = '<div class="moon-surface"></div><div class="earth"></div>';
+    wrap.innerHTML = '<div class="earth"></div>';
     document.body.appendChild(wrap);
 
     if (!document.hidden) { scheduleNextMeteor(wrap); scheduleImpact(wrap); }
@@ -111,22 +111,12 @@ function logout() {
     }, delay);
   }
 
-  // ===== อุกกาบาตพุ่งชนโลก/ดวงจันทร์ แล้วระเบิด (เหตุการณ์พิเศษ นานๆ ที) =====
+  // ===== อุกกาบาตพุ่งชนโลก แล้วระเบิด (เหตุการณ์พิเศษ นานๆ ที) =====
   function spawnImpact(wrap) {
     var earth = wrap.querySelector('.earth');
-    var moon = wrap.querySelector('.moon-surface');
-    var hitEarth = earth && Math.random() < 0.5;
-    var target;
-    if (hitEarth) {
-      var er = earth.getBoundingClientRect();
-      target = { x: er.left + er.width / 2, y: er.top + er.height / 2 };
-    } else {
-      var mr = moon ? moon.getBoundingClientRect() : null;
-      target = {
-        x: window.innerWidth * (0.3 + Math.random() * 0.4),
-        y: mr ? (mr.top + 14) : (window.innerHeight - 60)
-      };
-    }
+    if (!earth) return;
+    var er = earth.getBoundingClientRect();
+    var target = { x: er.left + er.width / 2, y: er.top + er.height / 2 };
     // จุดเริ่มบนขอบบนของจอ แล้วพุ่งเข้าหาเป้า
     var startX = window.innerWidth * (0.1 + Math.random() * 0.8);
     var startY = -20 + Math.random() * 40;
