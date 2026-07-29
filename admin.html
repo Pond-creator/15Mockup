@@ -62,6 +62,11 @@ function loadAll() {
 }
 loadAll();
 
+// เผื่อกรณีปล่อยเมาส์นอกไอคอนลาก (ไม่ trigger onmouseup ของ handle) — เคลียร์ draggable ค้างทิ้ง
+document.addEventListener('mouseup', function () {
+  document.querySelectorAll('.cat-drag[draggable="true"]').forEach(function (el) { el.draggable = false; });
+});
+
 function renderCategoryList() {
   var cats = Array.from(new Set(allLinks.map(function (l) { return l.category; })));
   document.getElementById('categoryList').innerHTML = cats.map(function (c) {
@@ -102,8 +107,12 @@ function renderTables() {
   categories.forEach(function (cat, ci) {
     var upDis = ci === 0 ? ' disabled' : '';
     var downDis = ci === categories.length - 1 ? ' disabled' : '';
-    html += '<div class="admin-section">';
+    html += '<div class="admin-section cat-drag" draggable="false" data-cat="' + escapeAttr(cat) + '"';
+    html += ' ondragstart="onCatDragStart(event)" ondragover="onCatDragOver(event)"';
+    html += ' ondragleave="onCatDragLeave(event)" ondrop="onCatDrop(event)" ondragend="onCatDragEnd(event)">';
     html += '<h3>';
+    // draggable เปิดเฉพาะตอนกดค้างที่ไอคอนนี้ — กันไม่ให้ชนกับการลากเลือกข้อความในช่อง input ของตาราง
+    html += '<span class="drag-handle" title="ลากเพื่อย้ายหมวด" onmousedown="this.closest(\'.cat-drag\').draggable=true" onmouseup="this.closest(\'.cat-drag\').draggable=false">⠿</span> ';
     html += '<button class="btn small" title="เลื่อนขึ้น" onclick="moveCategory(\'' + escapeAttr(cat) + '\',-1)"' + upDis + '>↑</button> ';
     html += '<button class="btn small" title="เลื่อนลง" onclick="moveCategory(\'' + escapeAttr(cat) + '\',1)"' + downDis + '>↓</button> ';
     html += 'หมวด: ' + escapeHtml(cat) + ' ';
@@ -138,6 +147,47 @@ function moveCategory(cat, dir) {
   apiPost('setCategoryOrders', { role: session.role, categories: cats }).then(function (res) {
     if (res.success) loadAll(); else alert(res.message || 'จัดลำดับไม่สำเร็จ');
   });
+}
+
+// ===== ลากย้ายหมวด (drag & drop) — ใช้ setCategoryOrders API ตัวเดิมกับปุ่ม ↑↓ =====
+var dragCat = null;
+
+function onCatDragStart(e) {
+  dragCat = e.currentTarget.dataset.cat;
+  e.dataTransfer.effectAllowed = 'move';
+  e.currentTarget.classList.add('dragging');
+}
+
+function onCatDragOver(e) {
+  e.preventDefault();   // ต้อง preventDefault ถึงจะ drop ได้
+  e.currentTarget.classList.add('drag-over');
+}
+
+function onCatDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+function onCatDrop(e) {
+  e.preventDefault();
+  var targetCat = e.currentTarget.dataset.cat;
+  e.currentTarget.classList.remove('drag-over');
+  if (!dragCat || dragCat === targetCat) return;
+  var cats = getOrderedCategories();
+  var fromIdx = cats.indexOf(dragCat);
+  var toIdx = cats.indexOf(targetCat);
+  if (fromIdx === -1 || toIdx === -1) return;
+  cats.splice(fromIdx, 1);
+  cats.splice(toIdx, 0, dragCat);
+  apiPost('setCategoryOrders', { role: session.role, categories: cats }).then(function (res) {
+    if (res.success) loadAll(); else alert(res.message || 'จัดลำดับไม่สำเร็จ');
+  });
+}
+
+function onCatDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  e.currentTarget.draggable = false;
+  document.querySelectorAll('.cat-drag.drag-over').forEach(function (el) { el.classList.remove('drag-over'); });
+  dragCat = null;
 }
 
 function toggleActive(id, isOn) {

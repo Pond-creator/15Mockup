@@ -44,6 +44,22 @@ function loadLinks() {
       container.innerHTML = '<div class="empty-msg">ยังไม่มีลิงก์ — ไปที่ "จัดการหน้า" เพื่อเพิ่ม</div>';
       return;
     }
+    // จำกัดสิทธิ์ user (admin เห็นทุกอย่างเสมอ)
+    // - allowedCategories: เห็นทั้งหมวด (ทุกลิงก์ในหมวดนั้น)
+    // - allowedLinks: เห็นเฉพาะลิงก์ที่ระบุ แม้หมวดนั้นจะไม่ได้อยู่ใน allowedCategories ก็ตาม
+    // - ทั้งสองว่าง = เห็นทุกอย่าง (ค่าเริ่มต้น ไม่ล็อกใคร)
+    var allowedCats = (session && session.allowedCategories) || [];
+    var allowedLinkIds = (session && session.allowedLinks) || [];
+    var restricted = session && session.role !== 'admin' && (allowedCats.length || allowedLinkIds.length);
+    if (restricted) {
+      links = links.filter(function (l) {
+        return allowedCats.indexOf(l.category) !== -1 || allowedLinkIds.indexOf(l.id) !== -1;
+      });
+    }
+    if (!links.length) {
+      container.innerHTML = '<div class="empty-msg">ยังไม่มีเมนูที่คุณเข้าถึงได้ — ติดต่อผู้ดูแลระบบ</div>';
+      return;
+    }
     hubByCategory = {};
     links.forEach(function (l) {
       if (!hubByCategory[l.category]) hubByCategory[l.category] = [];
@@ -55,15 +71,6 @@ function loadLinks() {
       if (oa !== ob) return oa - ob;
       return a.localeCompare(b);
     });
-    // จำกัดหมวดตามสิทธิ์ user (admin เห็นทุกหมวด, user ที่ระบุหมวดไว้เห็นเฉพาะที่ระบุ, ไม่ระบุ = เห็นทุกหมวด)
-    var allowed = (session && session.allowedCategories) || [];
-    if (session && session.role !== 'admin' && allowed.length) {
-      hubCategories = hubCategories.filter(function (c) { return allowed.indexOf(c) !== -1; });
-    }
-    if (!hubCategories.length) {
-      container.innerHTML = '<div class="empty-msg">ยังไม่มีเมนูที่คุณเข้าถึงได้ — ติดต่อผู้ดูแลระบบ</div>';
-      return;
-    }
     // โครงหน้า: ช่องค้นหา + พื้นที่แสดงหมวด
     container.innerHTML =
       '<div class="search-wrap">' +
