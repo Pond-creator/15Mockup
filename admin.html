@@ -64,7 +64,7 @@ loadAll();
 
 // เผื่อกรณีปล่อยเมาส์นอกไอคอนลาก (ไม่ trigger onmouseup ของ handle) — เคลียร์ draggable ค้างทิ้ง
 document.addEventListener('mouseup', function () {
-  document.querySelectorAll('.cat-drag[draggable="true"]').forEach(function (el) { el.draggable = false; });
+  document.querySelectorAll('.cat-drag[draggable="true"], .link-drag[draggable="true"]').forEach(function (el) { el.draggable = false; });
 });
 
 function renderCategoryList() {
@@ -119,11 +119,15 @@ function renderTables() {
     html += '<button class="btn small" onclick="renameCategory(\'' + escapeAttr(cat) + '\')">แก้ชื่อหมวด</button> ';
     html += '<button class="btn small danger" onclick="deleteCategory(\'' + escapeAttr(cat) + '\')">ลบทั้งหมวด</button>';
     html += '</h3>';
-    html += '<table><tr><th>ไอคอน</th><th>ชื่อลิงก์</th><th>รายละเอียด</th><th>URL</th><th>🔑 ต้อง login</th><th>สถานะ</th><th></th></tr>';
+    html += '<table><tr><th></th><th>ไอคอน</th><th>ชื่อลิงก์</th><th>รายละเอียด</th><th>URL</th><th>🔑 ต้อง login</th><th>สถานะ</th><th></th></tr>';
     byCategory[cat].forEach(function (l) {
       var isOn = l.active !== false;
       var needsLogin = l.requiresLogin === true;
-      html += '<tr>';
+      html += '<tr class="link-drag" draggable="false" data-link-id="' + escapeAttr(l.id) + '" data-cat="' + escapeAttr(cat) + '"';
+      html += ' ondragstart="onLinkDragStart(event)" ondragover="onLinkDragOver(event)"';
+      html += ' ondragleave="onLinkDragLeave(event)" ondrop="onLinkDrop(event)" ondragend="onLinkDragEnd(event)">';
+      // ลากด้วยไอคอนนี้เท่านั้น กันชนกับการลากเลือกข้อความในช่อง input
+      html += '<td><span class="drag-handle" title="ลากย้ายลิงก์นี้ไปหมวดอื่น/จัดลำดับ" onmousedown="this.closest(\'.link-drag\').draggable=true" onmouseup="this.closest(\'.link-drag\').draggable=false">⠿</span></td>';
       html += '<td><input type="text" value="' + escapeAttr(l.icon || '') + '" placeholder="🔗" style="width:52px;text-align:center;" onchange="updateLinkField(\'' + l.id + '\',\'icon\',this.value)"></td>';
       html += '<td><input type="text" value="' + escapeAttr(l.name) + '" onchange="updateLinkField(\'' + l.id + '\',\'name\',this.value)"></td>';
       html += '<td><input type="text" value="' + escapeAttr(l.description || '') + '" placeholder="คำอธิบาย" onchange="updateLinkField(\'' + l.id + '\',\'description\',this.value)"></td>';
@@ -188,6 +192,57 @@ function onCatDragEnd(e) {
   e.currentTarget.draggable = false;
   document.querySelectorAll('.cat-drag.drag-over').forEach(function (el) { el.classList.remove('drag-over'); });
   dragCat = null;
+}
+
+// ===== ลากย้ายลิงก์ (ระหว่างหมวด หรือจัดลำดับในหมวดเดิม) — ใช้ moveLink API =====
+var dragLinkId = null;
+
+function onLinkDragStart(e) {
+  e.stopPropagation();   // กันชนกับ drag ระดับหมวดของ .admin-section ที่ครอบอยู่
+  dragLinkId = e.currentTarget.dataset.linkId;
+  e.dataTransfer.effectAllowed = 'move';
+  e.currentTarget.classList.add('dragging');
+}
+
+function onLinkDragOver(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  e.currentTarget.classList.add('drag-over');
+}
+
+function onLinkDragLeave(e) {
+  e.stopPropagation();
+  e.currentTarget.classList.remove('drag-over');
+}
+
+function onLinkDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  var targetRow = e.currentTarget;
+  var targetCat = targetRow.dataset.cat;
+  var targetLinkId = targetRow.dataset.linkId;
+  targetRow.classList.remove('drag-over');
+  if (!dragLinkId || dragLinkId === targetLinkId) return;
+
+  // ลิงก์ทั้งหมดในหมวดปลายทาง (ไม่รวมตัวที่กำลังลาก) เรียงตาม linkOrder เดิม แล้วแทรก ณ ตำแหน่งที่ปล่อย
+  var destIds = allLinks
+    .filter(function (l) { return l.category === targetCat && l.id !== dragLinkId; })
+    .sort(function (a, b) { return (a.linkOrder || 0) - (b.linkOrder || 0); })
+    .map(function (l) { return l.id; });
+  var targetIdx = destIds.indexOf(targetLinkId);
+  if (targetIdx === -1) targetIdx = destIds.length;
+  destIds.splice(targetIdx, 0, dragLinkId);
+
+  apiPost('moveLink', { role: session.role, id: dragLinkId, category: targetCat, orderedIds: destIds }).then(function (res) {
+    if (res.success) loadAll(); else alert(res.message || 'ย้ายลิงก์ไม่สำเร็จ');
+  });
+}
+
+function onLinkDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  e.currentTarget.draggable = false;
+  document.querySelectorAll('.link-drag.drag-over').forEach(function (el) { el.classList.remove('drag-over'); });
+  dragLinkId = null;
 }
 
 function toggleActive(id, isOn) {
