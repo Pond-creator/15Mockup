@@ -247,7 +247,11 @@ function onLinkDragEnd(e) {
 
 function toggleActive(id, isOn) {
   apiPost('setLinkActive', { role: session.role, id: id, active: !isOn }).then(function (res) {
-    if (res.success) loadAll(); else alert(res.message || 'เปลี่ยนสถานะไม่สำเร็จ');
+    if (!res.success) { alert(res.message || 'เปลี่ยนสถานะไม่สำเร็จ'); return; }
+    // อัปเดตในเครื่องแทนโหลดใหม่ทั้งหมด — ไม่ต้องรอ GAS ตอบรอบสอง เร็วขึ้น
+    var link = allLinks.find(function (l) { return l.id === id; });
+    if (link) link.active = !isOn;
+    renderTables();
   });
 }
 
@@ -291,8 +295,15 @@ function updateLinkField(id, field, value) {
     requiresLogin: field === 'requiresLogin' ? value : (link.requiresLogin === true)
   };
   apiPost('editLink', payload).then(function (res) {
-    if (!res.success) alert(res.message || 'แก้ไขไม่สำเร็จ');
-    loadAll();
+    if (!res.success) { alert(res.message || 'แก้ไขไม่สำเร็จ'); loadAll(); return; }
+    // อัปเดตในเครื่องแทนโหลดใหม่ทั้งหมด — พิมพ์แก้ทีละช่องไม่ต้องรอ GAS ตอบรอบสองทุกครั้ง
+    link.category = payload.category;
+    link.name = payload.name;
+    link.url = payload.url;
+    link.description = payload.description;
+    link.icon = payload.icon;
+    link.requiresLogin = payload.requiresLogin;
+    renderTables();
   });
 }
 

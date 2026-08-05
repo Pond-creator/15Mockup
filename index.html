@@ -40,7 +40,9 @@ function doLogin() {
       var remember = document.getElementById('rememberMe').checked;
       setSession({
         username: username, role: res.role, displayName: res.displayName,
-        allowedCategories: res.allowedCategories || []
+        allowedCategories: res.allowedCategories || [],
+        allowedLinks: res.allowedLinks || [],
+        token: res.token, expiresAt: res.expiresAt
       }, remember);
       window.location.href = 'hub.html';
     } else {

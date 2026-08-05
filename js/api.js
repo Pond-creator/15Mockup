@@ -2,20 +2,44 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwwquk7dOo8DZN5TUXTVpbSBd
 // ต้องตรงกับ API_SECRET ใน gas/Code.gs เป๊ะๆ — เปลี่ยนทั้งสองที่พร้อมกันก่อน deploy จริง
 var API_SECRET = '61DCROZSKOyko7qUXZD36FInWGz5pVv';
 
+// ทุกคำขอ (นอกจาก login) แนบ username+token ของ session ปัจจุบันไปด้วยเสมอ
+// backend เช็ค token กับที่ออกให้ตอน login จริง — ไม่เชื่อ role ที่ client ส่งมาอ้างเองอีกต่อไป
 function apiGet(action, params) {
+  var s = getSession();
   var url = API_URL + '?action=' + encodeURIComponent(action) + '&secret=' + encodeURIComponent(API_SECRET);
+  if (s) url += '&username=' + encodeURIComponent(s.username) + '&token=' + encodeURIComponent(s.token || '');
   if (params) {
     for (var k in params) url += '&' + k + '=' + encodeURIComponent(params[k]);
   }
-  return fetch(url).then(function (r) { return r.json(); });
+  return fetch(url).then(function (r) { return r.json(); }).then(handleSessionExpiry);
 }
 
 function apiPost(action, payload) {
-  var body = Object.assign({ action: action, secret: API_SECRET }, payload || {});
+  var s = getSession();
+  var auth = s ? { username: s.username, token: s.token } : {};
+  var body = Object.assign({ action: action, secret: API_SECRET }, auth, payload || {});
   return fetch(API_URL, {
     method: 'POST',
     body: JSON.stringify(body)
-  }).then(function (r) { return r.json(); });
+  }).then(function (r) { return r.json(); }).then(handleSessionExpiry);
+}
+
+// ถ้า backend บอกว่า token ไม่ถูกต้อง/หมดอายุ → เคลียร์ session แล้วเด้งไป login ทันที
+// ถ้าคำขอสำเร็จปกติ → เลื่อนเวลาหมดอายุฝั่ง client ให้ตรงกับที่ server ต่ออายุให้ (sliding window)
+function handleSessionExpiry(res) {
+  if (res && res.success === false && /เซสชัน/.test(res.message || '')) {
+    logout();
+  } else if (res && res.success !== false) {
+    touchSession();
+  }
+  return res;
+}
+
+function touchSession() {
+  var s = getSession();
+  if (!s || !s.token) return;
+  s.expiresAt = Date.now() + 8 * 60 * 60 * 1000;
+  setSession(s, !!localStorage.getItem('hubUser'));
 }
 
 // "จำฉันไว้" ติ๊ก = เก็บใน localStorage (อยู่ข้ามการปิดเบราว์เซอร์ จนกว่าจะ logout เอง)
@@ -42,12 +66,25 @@ function requireLogin() {
     window.location.href = 'index.html';
     return null;
   }
+  // เช็คหมดอายุฝั่ง client ก่อน (ประมาณการ ไม่ต้องรอ API ตอบ) — ไม่ใช้งานเกิน 8 ชม. ต้อง login ใหม่
+  if (s.expiresAt && Date.now() > s.expiresAt) {
+    logout();
+    return null;
+  }
   return s;
 }
 
 function logout() {
+  var s = getSession();
   sessionStorage.removeItem('hubUser');
   localStorage.removeItem('hubUser');
+  if (s && s.username && s.token) {
+    // แจ้ง server ให้ยกเลิก token ด้วย (fire-and-forget ไม่ต้องรอผลลัพธ์)
+    fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'logoutUser', secret: API_SECRET, username: s.username, token: s.token })
+    }).catch(function () {});
+  }
   window.location.href = 'index.html';
 }
 
