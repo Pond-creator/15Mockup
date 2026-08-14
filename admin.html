@@ -142,6 +142,16 @@ function renderTables() {
   area.innerHTML = html;
 }
 
+// อัปเดต categoryOrder ในเครื่องให้ตรงกับลำดับใหม่ + วาดใหม่ — ไม่ต้องรอ GAS ตอบรอบสอง (loadAll)
+function applyCategoryOrderLocally(cats) {
+  var rank = {};
+  cats.forEach(function (c, i) { rank[c] = i; });
+  allLinks.forEach(function (l) {
+    if (rank.hasOwnProperty(l.category)) l.categoryOrder = rank[l.category];
+  });
+  renderTables();
+}
+
 function moveCategory(cat, dir) {
   var cats = getOrderedCategories();
   var idx = cats.indexOf(cat);
@@ -149,7 +159,8 @@ function moveCategory(cat, dir) {
   if (idx < 0 || swap < 0 || swap >= cats.length) return;
   var tmp = cats[idx]; cats[idx] = cats[swap]; cats[swap] = tmp;
   apiPost('setCategoryOrders', { role: session.role, categories: cats }).then(function (res) {
-    if (res.success) loadAll(); else alert(res.message || 'จัดลำดับไม่สำเร็จ');
+    if (!res.success) { alert(res.message || 'จัดลำดับไม่สำเร็จ'); return; }
+    applyCategoryOrderLocally(cats);
   });
 }
 
@@ -183,7 +194,8 @@ function onCatDrop(e) {
   cats.splice(fromIdx, 1);
   cats.splice(toIdx, 0, dragCat);
   apiPost('setCategoryOrders', { role: session.role, categories: cats }).then(function (res) {
-    if (res.success) loadAll(); else alert(res.message || 'จัดลำดับไม่สำเร็จ');
+    if (!res.success) { alert(res.message || 'จัดลำดับไม่สำเร็จ'); return; }
+    applyCategoryOrderLocally(cats);
   });
 }
 
@@ -234,7 +246,15 @@ function onLinkDrop(e) {
   destIds.splice(targetIdx, 0, dragLinkId);
 
   apiPost('moveLink', { role: session.role, id: dragLinkId, category: targetCat, orderedIds: destIds }).then(function (res) {
-    if (res.success) loadAll(); else alert(res.message || 'ย้ายลิงก์ไม่สำเร็จ');
+    if (!res.success) { alert(res.message || 'ย้ายลิงก์ไม่สำเร็จ'); return; }
+    // อัปเดตในเครื่องแทนโหลดใหม่ทั้งหมด — ลากได้ต่อเนื่องไม่ต้องรอ GAS ตอบทุกครั้ง
+    var rank = {};
+    destIds.forEach(function (id, i) { rank[id] = i; });
+    allLinks.forEach(function (l) {
+      if (l.id === dragLinkId) l.category = targetCat;
+      if (rank.hasOwnProperty(l.id)) l.linkOrder = rank[l.id];
+    });
+    renderTables();
   });
 }
 
@@ -318,7 +338,10 @@ function renameCategory(oldName) {
   var newName = prompt('ชื่อหมวดใหม่', oldName);
   if (!newName || newName === oldName) return;
   apiPost('renameCategory', { role: session.role, oldName: oldName, newName: newName }).then(function (res) {
-    if (res.success) loadAll(); else alert(res.message || 'แก้ไขไม่สำเร็จ');
+    if (!res.success) { alert(res.message || 'แก้ไขไม่สำเร็จ'); return; }
+    allLinks.forEach(function (l) { if (l.category === oldName) l.category = newName; });
+    renderCategoryList();
+    renderTables();
   });
 }
 

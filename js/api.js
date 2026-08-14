@@ -39,24 +39,18 @@ function touchSession() {
   var s = getSession();
   if (!s || !s.token) return;
   s.expiresAt = Date.now() + 8 * 60 * 60 * 1000;
-  setSession(s, !!localStorage.getItem('hubUser'));
+  setSession(s);
 }
 
-// "จำฉันไว้" ติ๊ก = เก็บใน localStorage (อยู่ข้ามการปิดเบราว์เซอร์ จนกว่าจะ logout เอง)
-// ไม่ติ๊ก = เก็บใน sessionStorage (หายเมื่อปิดแท็บ) เหมือนเดิม
-function setSession(data, remember) {
-  var raw = JSON.stringify(data);
-  if (remember) {
-    localStorage.setItem('hubUser', raw);
-    sessionStorage.removeItem('hubUser');
-  } else {
-    sessionStorage.setItem('hubUser', raw);
-    localStorage.removeItem('hubUser');
-  }
+// เลิกรองรับ "จำฉันไว้" แล้ว — เก็บใน sessionStorage เท่านั้น (ปิดแท็บ/เบราว์เซอร์ = หลุด session ต้อง login ใหม่เสมอ)
+function setSession(data) {
+  sessionStorage.setItem('hubUser', JSON.stringify(data));
 }
 
 function getSession() {
-  var raw = localStorage.getItem('hubUser') || sessionStorage.getItem('hubUser');
+  // เคลียร์ session แบบ "จำไว้" ของเก่าที่อาจค้างจาก localStorage (ฟีเจอร์นี้ถูกถอดออกแล้ว) — บังคับ login ใหม่เสมอ
+  if (localStorage.getItem('hubUser')) localStorage.removeItem('hubUser');
+  var raw = sessionStorage.getItem('hubUser');
   return raw ? JSON.parse(raw) : null;
 }
 
