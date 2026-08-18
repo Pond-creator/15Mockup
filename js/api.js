@@ -2,12 +2,14 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwwquk7dOo8DZN5TUXTVpbSBd
 // ต้องตรงกับ API_SECRET ใน gas/Code.gs เป๊ะๆ — เปลี่ยนทั้งสองที่พร้อมกันก่อน deploy จริง
 var API_SECRET = '61DCROZSKOyko7qUXZD36FInWGz5pVv';
 
-// ทุกคำขอ (นอกจาก login) แนบ username+token ของ session ปัจจุบันไปด้วยเสมอ
+// ทุกคำขอ (นอกจาก login) แนบตัวตนของ session ปัจจุบันไปด้วยเสมอ ผ่านชื่อ field พิเศษ "_authUser"/"_authToken"
+// (ตั้งใจใช้ชื่อไม่ซ้ำกับ field ธรรมดา — เคยใช้ชื่อ username/token เฉยๆ แล้วชนกับ payload ของ addUser/editUser/deleteUser
+//  ที่ก็มี field ชื่อ "username" สำหรับ "user เป้าหมายที่กำลังจัดการ" เหมือนกัน ทำให้ค่าทับกันจนตรวจสอบสิทธิ์ผิดคน)
 // backend เช็ค token กับที่ออกให้ตอน login จริง — ไม่เชื่อ role ที่ client ส่งมาอ้างเองอีกต่อไป
 function apiGet(action, params) {
   var s = getSession();
   var url = API_URL + '?action=' + encodeURIComponent(action) + '&secret=' + encodeURIComponent(API_SECRET);
-  if (s) url += '&username=' + encodeURIComponent(s.username) + '&token=' + encodeURIComponent(s.token || '');
+  if (s) url += '&_authUser=' + encodeURIComponent(s.username) + '&_authToken=' + encodeURIComponent(s.token || '');
   if (params) {
     for (var k in params) url += '&' + k + '=' + encodeURIComponent(params[k]);
   }
@@ -16,7 +18,7 @@ function apiGet(action, params) {
 
 function apiPost(action, payload) {
   var s = getSession();
-  var auth = s ? { username: s.username, token: s.token } : {};
+  var auth = s ? { _authUser: s.username, _authToken: s.token } : {};
   var body = Object.assign({ action: action, secret: API_SECRET }, auth, payload || {});
   return fetch(API_URL, {
     method: 'POST',
