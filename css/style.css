@@ -552,6 +552,61 @@ table select {
 
 .empty-msg { color: #8a93b5; text-align: center; padding: 44px 0; }
 
+/* ===== หน้ากำลังโหลด: วงแหวนหมุน + เลข % ใหญ่ตรงกลางจอ (startFakeProgress ใน api.js) ===== */
+.loading-box {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto auto;
+  row-gap: 28px;
+  justify-items: center;
+  align-content: center;
+  z-index: 999;
+  padding: 20px;
+  background: radial-gradient(ellipse at center, rgba(20, 16, 50, 0.55) 0%, rgba(6, 7, 20, 0.88) 70%);
+  backdrop-filter: blur(6px);
+  animation: loadingFadeIn 0.25s ease;
+}
+@keyframes loadingFadeIn { from { opacity: 0; } to { opacity: 1; } }
+/* วงแหวนกับเลข % ซ้อนอยู่ตำแหน่งเดียวกัน (grid-area เดียวกัน) กลายเป็นวงแหวนตัวเลขวงเดียว */
+.loading-box .spinner,
+.loading-box .loading-pct {
+  grid-row: 1;
+  grid-column: 1;
+}
+.spinner {
+  width: 190px;
+  height: 190px;
+  border-radius: 50%;
+  border: 6px solid rgba(120, 150, 255, 0.15);
+  border-top-color: #7a5cff;
+  border-right-color: #ff5cd6;
+  animation: spin 1.1s cubic-bezier(0.6, 0.1, 0.4, 0.9) infinite;
+  box-shadow: 0 0 40px rgba(120, 92, 255, 0.45), inset 0 0 30px rgba(120, 92, 255, 0.15);
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-pct {
+  align-self: center;
+  justify-self: center;
+  font-size: 64px;
+  font-weight: 800;
+  color: #ffe14d;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 18px rgba(255, 225, 80, 0.75), 0 0 46px rgba(255, 225, 80, 0.35);
+  animation: pctPulse 1.6s ease-in-out infinite;
+}
+@keyframes pctPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+.loading-text {
+  margin: 0;
+  color: #cfd6ff;
+  font-size: 18px;
+  letter-spacing: 1px;
+}
+
 /* ===== เอฟเฟกต์ตอนเมาส์ชี้ปุ่ม: ฝูงดาวพุ่งเข้าหาปุ่ม (ไม่กระพริบ) ===== */
 .btn, .link-card, .topbar a, .topbar button, .topbar-toggle, .login-box button, .nav-tabs a {
   position: relative;
