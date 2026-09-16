@@ -26,6 +26,29 @@ function apiPost(action, payload) {
   }).then(function (r) { return r.json(); }).then(handleSessionExpiry);
 }
 
+/**
+ * ตัวเลข % จำลองระหว่างรอโหลด (ไม่ใช่ % จริงเพราะเป็นแค่ 1 คำขอ แบ่งขั้นไม่ได้ — เหมือนที่ใช้ใน Premium Stat)
+ * วิ่งเร็วตอนแรกแล้วค่อยๆ ช้าลง ค้างที่ 89% รอผลจริง แล้วค่อยกระโดดไป 100%
+ * ใช้: const p = startFakeProgress(el); ... p.finish(); หรือ p.stop() ตอน error
+ */
+function startFakeProgress(el) {
+  var pct = 0;
+  var timer = setInterval(function () {
+    pct += (90 - pct) * 0.08 + 0.3;
+    if (pct > 89) pct = 89;
+    el.textContent = Math.floor(pct) + '%';
+  }, 150);
+  return {
+    finish: function () {
+      clearInterval(timer);
+      el.textContent = '100%';
+    },
+    stop: function () {
+      clearInterval(timer);
+    }
+  };
+}
+
 // ถ้า backend บอกว่า token ไม่ถูกต้อง/หมดอายุ → เคลียร์ session แล้วเด้งไป login ทันที
 // ถ้าคำขอสำเร็จปกติ → เลื่อนเวลาหมดอายุฝั่ง client ให้ตรงกับที่ server ต่ออายุให้ (sliding window)
 function handleSessionExpiry(res) {
@@ -74,6 +97,7 @@ function logout() {
   var s = getSession();
   sessionStorage.removeItem('hubUser');
   localStorage.removeItem('hubUser');
+  clearLinksCache();   // กันคนถัดไปที่ login เครื่อง/แท็บเดียวกัน เห็นลิงก์ค้างของคนก่อนหน้า
   if (s && s.username && s.token) {
     // แจ้ง server ให้ยกเลิก token ด้วย (fire-and-forget ไม่ต้องรอผลลัพธ์)
     fetch(API_URL, {
@@ -82,6 +106,41 @@ function logout() {
     }).catch(function () {});
   }
   window.location.href = 'index.html';
+}
+
+// ===== แคชลิงก์สั้นๆ ฝั่งเบราว์เซอร์ (เฉพาะหน้า hub.html) =====
+// เร่งความเร็ว "รู้สึกได้จริง" ตอนสลับหน้าไปมาบ่อยๆ ภายในไม่กี่วินาที โดยไม่เสี่ยงเห็นข้อมูลเก่าค้างนาน
+// เพราะใช้แบบ stale-while-revalidate: โชว์ของแคชก่อนทันที (ไม่รอ) แล้วดึงของจริงมาอัปเดตเงียบๆ เบื้องหลังเสมอ
+var LINKS_CACHE_KEY = 'hubLinksCache';
+var LINKS_CACHE_TTL_MS = 45000;   // ใช้ของแคชได้ถ้าอายุไม่เกิน 45 วิ (เกินนี้ถือว่าเก่าเกินไป ไม่ใช้เลย)
+
+function getLinksCache() {
+  var s = getSession();
+  if (!s) return null;
+  try {
+    var raw = sessionStorage.getItem(LINKS_CACHE_KEY);
+    if (!raw) return null;
+    var cache = JSON.parse(raw);
+    if (cache.username !== s.username) return null;   // คนละ user ห้ามใช้แคชของกันและกัน
+    if (Date.now() - cache.savedAt > LINKS_CACHE_TTL_MS) return null;
+    return cache.data;
+  } catch (e) {
+    return null;
+  }
+}
+
+function setLinksCache(data) {
+  var s = getSession();
+  if (!s) return;
+  try {
+    sessionStorage.setItem(LINKS_CACHE_KEY, JSON.stringify({ username: s.username, savedAt: Date.now(), data: data }));
+  } catch (e) {
+    /* เพิกเฉยถ้า storage เต็ม/ถูกปิดใช้งาน — แค่ไม่มีแคช ไม่กระทบการทำงานหลัก */
+  }
+}
+
+function clearLinksCache() {
+  sessionStorage.removeItem(LINKS_CACHE_KEY);
 }
 
 // แทรกฉากอวกาศ (โลกหมุนช้าๆ) แล้วยิงดาวตกแบบสุ่ม นานๆ ที (เบามาก — element เดียวโผล่แล้วหายทีละดวง)
