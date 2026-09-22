@@ -74,14 +74,23 @@ var allUsers = [];
 var allCategories = [];   // ชื่อหมวดทั้งหมด เรียงตาม categoryOrder
 var allLinksData = [];    // ลิงก์ทั้งหมด (ใช้สร้าง checkbox ย่อยรายลิงก์)
 var catModalUsername = null;
+var isFirstLoad = true;   // โชว์สปินเนอร์+% แค่ตอนโหลดหน้าครั้งแรก
 
 function loadData() {
+  var progress = null;
+  if (isFirstLoad) {
+    document.getElementById('userTable').innerHTML =
+      '<tr><td colspan="6"><div class="loading-box"><div class="spinner"></div><p class="loading-pct" id="loadingPctUsers">0%</p><p class="loading-text">กำลังโหลด...</p></div></td></tr>';
+    progress = startFakeProgress(document.getElementById('loadingPctUsers'));
+  }
   Promise.all([apiGet('getUsers'), apiGet('getLinks')]).then(function (results) {
     var uRes = results[0], lRes = results[1];
     allUsers = (uRes && uRes.success) ? (uRes.data || []) : [];
     allLinksData = (lRes && lRes.success) ? (lRes.data || []) : [];
     allCategories = buildCategoryList(allLinksData);
     buildCatChecks(document.getElementById('newCatsChecks'), [], []);
+    if (progress) progress.finish();
+    isFirstLoad = false;
     renderUsers();
   });
 }

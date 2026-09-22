@@ -2,6 +2,48 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbwwquk7dOo8DZN5TUXTVpbSBd
 // ต้องตรงกับ API_SECRET ใน gas/Code.gs เป๊ะๆ — เปลี่ยนทั้งสองที่พร้อมกันก่อน deploy จริง
 var API_SECRET = '61DCROZSKOyko7qUXZD36FInWGz5pVv';
 
+// ===== ตัดรอบที่ค้าง + ลองใหม่อัตโนมัติ (timeout + retry) =====
+// Apps Script ของ Google "สุ่มค้าง" เป็นบางครั้ง: ตอนดีตอบ ~2 วิ ตอนเพี้ยนค้าง 30-60 วิ แล้วคาย 302/404
+// วัดจริง 22/09/2569 ด้วย curl (ไม่ผ่านโค้ดนี้เลย): URL เดิมคำสั่งเดิม สลับได้ตั้งแต่ 1.7 วิ ถึง 34 วิ
+// -> เป็นปัญหาฝั่ง Google ไม่ใช่โค้ดนี้ (ดูบันทึก feedback_gas_random_404)
+// กลยุทธ์ที่ใช้: รอเกิน 15 วิ = ตัดทิ้งแล้วยิงใหม่ เพราะรอบใหม่มักได้ ~2 วิ (เร็วกว่ารอรอบที่ค้างจนจบ)
+var REQUEST_TIMEOUT_MS = 15000;   // ตัดรอบที่ค้างทิ้งที่ 15 วิ
+var RETRY_MAX = 2;                // ลองใหม่อีก 2 ครั้ง (รวม 3 โอกาส ~สำเร็จ 94%) แย่สุดรอ ~48 วิ
+var RETRY_GAP_MS = 1200;          // เว้นระหว่างแต่ละครั้ง
+// คำสั่งเขียนข้อมูลที่ retry ไม่ได้ ให้เวลายาวกว่า - กันตัดทิ้งทั้งที่ server เขียนสำเร็จไปแล้ว
+// (ถ้าตัดเร็วจะขึ้น error ทั้งที่ข้อมูลเข้าชีตแล้ว ผู้ใช้จะกดซ้ำจนได้ข้อมูลซ้ำ)
+var WRITE_TIMEOUT_MS = 60000;
+
+// คำสั่ง POST ที่ยิงซ้ำได้อย่างปลอดภัย (ไม่ appendRow ไม่สร้างแถวใหม่ในชีต)
+// ห้ามเติม addLink/addUser เข้ามา - สองตัวนี้ใช้ appendRow ยิงซ้ำจะได้ข้อมูลซ้ำในชีต
+var RETRY_SAFE_POST = ['login', 'logoutUser'];
+
+// fetch พร้อมนาฬิกาจับเวลา - เกินเวลาแล้วยกเลิกคำขอนั้นทิ้ง
+function fetchWithTimeout(url, options, timeoutMs) {
+  var ctrl = new AbortController();
+  var timer = setTimeout(function () { ctrl.abort(); }, timeoutMs);
+  var opts = Object.assign({}, options || {}, { signal: ctrl.signal });
+  return fetch(url, opts).then(function (r) {
+    clearTimeout(timer);
+    // 302/404 ที่ Google คายออกมาตอนเพี้ยน ก็นับเป็นความผิดพลาด ให้ไปลองใหม่
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();   // ถ้าได้หน้า error HTML ของ Google มาแทน JSON ตัวนี้จะ throw เอง
+  }).catch(function (err) {
+    clearTimeout(timer);
+    throw err;
+  });
+}
+
+// ลองซ้ำได้สูงสุด RETRY_MAX ครั้ง - ใช้เฉพาะคำสั่งที่ยิงซ้ำแล้วข้อมูลไม่เพี้ยน
+function fetchWithRetry(url, options, timeoutMs, attemptsLeft) {
+  if (attemptsLeft === undefined) attemptsLeft = RETRY_MAX;
+  return fetchWithTimeout(url, options, timeoutMs).catch(function (err) {
+    if (attemptsLeft <= 0) throw err;
+    return new Promise(function (resolve) { setTimeout(resolve, RETRY_GAP_MS); })
+      .then(function () { return fetchWithRetry(url, options, timeoutMs, attemptsLeft - 1); });
+  });
+}
+
 // ทุกคำขอ (นอกจาก login) แนบตัวตนของ session ปัจจุบันไปด้วยเสมอ ผ่านชื่อ field พิเศษ "_authUser"/"_authToken"
 // (ตั้งใจใช้ชื่อไม่ซ้ำกับ field ธรรมดา — เคยใช้ชื่อ username/token เฉยๆ แล้วชนกับ payload ของ addUser/editUser/deleteUser
 //  ที่ก็มี field ชื่อ "username" สำหรับ "user เป้าหมายที่กำลังจัดการ" เหมือนกัน ทำให้ค่าทับกันจนตรวจสอบสิทธิ์ผิดคน)
@@ -13,17 +55,21 @@ function apiGet(action, params) {
   if (params) {
     for (var k in params) url += '&' + k + '=' + encodeURIComponent(params[k]);
   }
-  return fetch(url).then(function (r) { return r.json(); }).then(handleSessionExpiry);
+  // GET = อ่านอย่างเดียว ยิงซ้ำกี่ครั้งก็ไม่กระทบข้อมูล - retry ได้เต็มที่
+  return fetchWithRetry(url, null, REQUEST_TIMEOUT_MS).then(handleSessionExpiry);
 }
 
 function apiPost(action, payload) {
   var s = getSession();
   var auth = s ? { _authUser: s.username, _authToken: s.token } : {};
   var body = Object.assign({ action: action, secret: API_SECRET }, auth, payload || {});
-  return fetch(API_URL, {
-    method: 'POST',
-    body: JSON.stringify(body)
-  }).then(function (r) { return r.json(); }).then(handleSessionExpiry);
+  var options = { method: 'POST', body: JSON.stringify(body) };
+  // คำสั่งที่ยิงซ้ำปลอดภัย (login/logout) -> ตัดที่ 15 วิ + ลองใหม่อัตโนมัติ
+  // คำสั่งเขียนข้อมูลอื่นๆ -> รอได้ถึง 60 วิ แต่ยิงครั้งเดียว (กันข้อมูลซ้ำในชีต)
+  var p = (RETRY_SAFE_POST.indexOf(action) !== -1)
+    ? fetchWithRetry(API_URL, options, REQUEST_TIMEOUT_MS)
+    : fetchWithTimeout(API_URL, options, WRITE_TIMEOUT_MS);
+  return p.then(handleSessionExpiry);
 }
 
 /**

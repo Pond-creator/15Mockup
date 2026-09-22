@@ -14,7 +14,8 @@
     <div class="error-msg" id="errMsg"></div>
     <input type="text" id="username" placeholder="ชื่อผู้ใช้" autocomplete="username">
     <input type="password" id="password" placeholder="รหัสผ่าน" autocomplete="current-password">
-    <button onclick="doLogin()">เข้าสู่ระบบ</button>
+    <button id="loginBtn" onclick="doLogin()">เข้าสู่ระบบ</button>
+    <div class="hint-msg" id="hintMsg"></div>
   </div>
 </div>
 <script src="js/api.js"></script>
@@ -23,16 +24,40 @@ document.getElementById('password').addEventListener('keydown', function (e) {
   if (e.key === 'Enter') doLogin();
 });
 
+// เวลารอก่อนขึ้นข้อความปลอบใจว่าเซิร์ฟเวอร์ช้า (Google สุ่มช้าได้ถึง 30 วิ)
+var SLOW_HINT_MS = 8000;
+var loginBusy = false;   // กันกดปุ่ม/กด Enter ซ้ำระหว่างที่ยังรอผลอยู่
+
+// สลับปุ่มเข้า/ออกโหมด "กำลังทำงาน" — ให้เห็นทันทีที่กดว่ากดติดแล้ว ไม่ใช่เงียบหาย
+function setLoginBusy(busy) {
+  var btn = document.getElementById('loginBtn');
+  loginBusy = busy;
+  btn.disabled = busy;
+  btn.innerHTML = busy
+    ? '<span class="btn-spin"></span>กำลังเข้าสู่ระบบ...'
+    : 'เข้าสู่ระบบ';
+  if (!busy) document.getElementById('hintMsg').textContent = '';
+}
+
 function doLogin() {
+  if (loginBusy) return;   // กำลังรออยู่ กดซ้ำไม่มีผล
   var username = document.getElementById('username').value.trim();
   var password = document.getElementById('password').value;
   var errEl = document.getElementById('errMsg');
+  var hintEl = document.getElementById('hintMsg');
   errEl.textContent = '';
   if (!username || !password) {
     errEl.textContent = 'กรอกชื่อผู้ใช้และรหัสผ่านให้ครบ';
     return;
   }
+  setLoginBusy(true);
+  // ถ้าเกิน 8 วิยังไม่ได้คำตอบ บอกผู้ใช้ว่าไม่ได้ค้าง — ระบบกำลังลองใหม่ให้เอง
+  var hintTimer = setTimeout(function () {
+    hintEl.textContent = 'เซิร์ฟเวอร์ Google ตอบช้ากว่าปกติ กำลังลองใหม่อัตโนมัติ...';
+  }, SLOW_HINT_MS);
+
   apiPost('login', { username: username, password: password }).then(function (res) {
+    clearTimeout(hintTimer);
     if (res.success) {
       setSession({
         username: username, role: res.role, displayName: res.displayName,
@@ -40,12 +65,16 @@ function doLogin() {
         allowedLinks: res.allowedLinks || [],
         token: res.token, expiresAt: res.expiresAt
       });
+      // ไม่ปลดปุ่ม ปล่อยให้หมุนต่อระหว่างเปลี่ยนหน้าไป hub (กันจอนิ่งเหมือนไม่มีอะไรเกิดขึ้น)
       window.location.href = 'hub.html';
     } else {
+      setLoginBusy(false);
       errEl.textContent = res.message || 'เข้าสู่ระบบไม่สำเร็จ';
     }
   }).catch(function () {
-    errEl.textContent = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้';
+    clearTimeout(hintTimer);
+    setLoginBusy(false);
+    errEl.textContent = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ (ลองใหม่ให้แล้ว 3 ครั้ง) — กดเข้าสู่ระบบอีกครั้งได้เลย';
   });
 }
 </script>

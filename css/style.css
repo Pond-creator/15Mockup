@@ -386,6 +386,24 @@ body::after {
 }
 .login-box button:hover { box-shadow: 0 0 20px rgba(120, 120, 255, 0.6); transform: translateY(-2px) scale(1.03); }
 .error-msg { color: #ff8a9c; font-size: 13px; margin-bottom: 10px; min-height: 16px; }
+/* ===== ปุ่มตอนกำลังทำงาน (ใช้ @keyframes spin ตัวเดียวกับสปินเนอร์ใหญ่ ไม่ต้องสร้างใหม่) ===== */
+.login-box button:disabled { cursor: progress; opacity: .9; }
+.login-box button:disabled:hover { box-shadow: none; transform: none; }
+.login-box button:disabled::after { display: none; }   /* ปิดเอฟเฟกต์ฝูงดาวตอน hover ระหว่างรอ */
+.btn-spin {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  vertical-align: -2px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  animation: spin .7s linear infinite;
+}
+/* ข้อความบอกว่าเซิร์ฟเวอร์ช้า ไม่ใช่ error (สีเหลืองอ่อน คนละสีกับ .error-msg) */
+.hint-msg { color: #ffe14d; font-size: 12.5px; margin-top: 10px; text-align: center; min-height: 16px; line-height: 1.5; }
+
 
 /* ===== เลือกเมนูต่อ user (checkbox หมวด + ลิงก์ย่อย) ===== */
 .cat-hint { font-size: 13px; color: #aeb8dd; margin-bottom: 8px; }

@@ -52,10 +52,19 @@ if (!session || session.role !== 'admin') {
 document.getElementById('whoami').textContent = session.displayName + ' (' + session.role + ')';
 
 var allLinks = [];
+var isFirstLoad = true;   // โชว์สปินเนอร์+% แค่ตอนโหลดหน้าครั้งแรก ไม่ใช่ทุกครั้งที่ loadAll() ถูกเรียกซ้ำหลังแก้ไข
 
 function loadAll() {
+  var progress = null;
+  if (isFirstLoad) {
+    document.getElementById('categoriesArea').innerHTML =
+      '<div class="loading-box"><div class="spinner"></div><p class="loading-pct" id="loadingPct">0%</p><p class="loading-text">กำลังโหลด...</p></div>';
+    progress = startFakeProgress(document.getElementById('loadingPct'));
+  }
   apiGet('getLinks').then(function (res) {
     allLinks = res.success ? (res.data || []) : [];
+    if (progress) progress.finish();
+    isFirstLoad = false;
     renderCategoryList();
     renderTables();
   });
